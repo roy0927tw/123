@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stroop 中文測驗</title>
+<style>
+  body { font-family:"Microsoft JhengHei",sans-serif; text-align:center; background:#f5f5f5; }
+  h1 { font-size:3em; margin-top:20px; }
+  .setup,.game,.result { margin-top:40px; }
+  .color-word { font-size:80px; margin:40px 0; font-weight:bold; min-height:100px; }
+  .btn { display:inline-block; font-size:32px; padding:20px 40px; margin:15px; border-radius:12px; border:none; cursor:pointer; color:#fff; }
+  .btn-red{background:#e74c3c;} .btn-blue{background:#3498db;}
+  .btn-green{background:#2ecc71;} .btn-yellow{background:#f1c40f;color:#000;}
+  .btn-purple{background:#9b59b6;} .btn-black{background:#2c3e50;}
+  .btn-gray{background:#7f8c8d;} .btn-white{background:#ecf0f1;color:#000;}
+  .hidden{display:none;}
+  #feedback{font-size:28px;margin-top:20px;color:#2c3e50;min-height:40px;}
+</style>
+</head>
+<body>
+
+<h1>Stroop 中文測驗</h1>
+
+<div class="setup">
+  <p>姓名：<input type="text" id="playerName"></p>
+  <p>
+    選擇難度：
+    <select id="difficulty">
+      <option value="easy">簡單</option>
+      <option value="medium">中等</option>
+      <option value="hard">困難</option>
+    </select>
+  </p>
+  <button onclick="startGame()">開始測驗</button>
+</div>
+
+<div class="game hidden">
+  <div id="colorWord" class="color-word"></div>
+  <div id="buttons"></div>
+  <p>題目：<span id="progress">0</span>/<span id="total">0</span></p>
+  <p id="feedback"></p>
+</div>
+
+<div class="result hidden">
+  <h2>測驗結束</h2>
+  <p>姓名：<span id="rName"></span></p>
+  <p>日期：<span id="rDate"></span></p>
+  <p>正確：<span id="rCorrect"></span> / 錯誤：<span id="rWrong"></span></p>
+  <p>平均反應時間：<span id="rAvgTime"></span> 秒</p>
+  <p>總分：<span id="rScore"></span></p>
+  <button onclick="downloadResult()">下載結果 (CSV)</button>
+</div>
+
+<script>
+const colorOptions = {
+  easy: ["紅","藍"],
+  medium: ["紅","藍","綠","黃"],
+  hard: ["紅","藍","綠","黃","紫","黑"]
+};
+const colorMap = {
+  "紅":"red","藍":"blue","綠":"green",
+  "黃":"yellow","紫":"purple","黑":"black",
+  "灰":"gray","白":"white"
+};
+
+let currentColor;
+let questionCount,totalQuestions;
+let correct,wrong;
+let startTime,times=[];
+let playerName,difficulty;
+
+function startGame(){
+  playerName=document.getElementById("playerName").value||"未命名";
+  difficulty=document.getElementById("difficulty").value;
+
+  if(difficulty==="easy") totalQuestions=10;
+  else if(difficulty==="medium") totalQuestions=20;
+  else totalQuestions=40;
+
+  correct=0;wrong=0;times=[];questionCount=0;
+
+  document.querySelector(".setup").classList.add("hidden");
+  document.querySelector(".game").classList.remove("hidden");
+  document.getElementById("total").textContent=totalQuestions;
+
+  nextQuestion();
+}
+
+function nextQuestion(){
+  if(questionCount>=totalQuestions){endGame();return;}
+
+  const colors=colorOptions[difficulty];
+  let text=colors[Math.floor(Math.random()*colors.length)];
+  let color=colors[Math.floor(Math.random()*colors.length)];
+
+  currentColor=colorMap[color];
+
+  if(difficulty==="hard" && Math.random()<0.3){text="";} // 隱藏文字
+
+  const wordDiv=document.getElementById("colorWord");
+  wordDiv.textContent=text || "●";
+  wordDiv.style.color=currentColor;
+
+  const btnDiv=document.getElementById("buttons");
+  btnDiv.innerHTML="";
+  let btnColors=[...colors];
+
+  if(difficulty==="hard"){
+    if(Math.random()<0.5) btnColors.push("灰");
+    if(Math.random()<0.5) btnColors.push("白");
+  }
+
+  btnColors.forEach(c=>{
+    let btn=document.createElement("button");
+    btn.textContent=c;
+    btn.className="btn btn-"+colorMap[c];
+    btn.onclick=()=>checkAnswer(c);
+    btnDiv.appendChild(btn);
+  });
+
+  questionCount++;
+  document.getElementById("progress").textContent=questionCount;
+  document.getElementById("feedback").textContent="";
+  startTime=new Date();
+}
+
+function checkAnswer(choice){
+  let rt=(new Date()-startTime)/1000;
+  times.push(rt);
+
+  let isCorrect=colorMap[choice]===currentColor;
+  let feedback=`反應時間：${rt.toFixed(2)} 秒`;
+
+  if(difficulty==="hard" && rt>2){wrong++;feedback+="（超時）";}
+  else if(isCorrect){correct++;feedback+=" ✅";}
+  else{wrong++;feedback+=" ❌";}
+
+  document.getElementById("feedback").textContent=feedback;
+  setTimeout(nextQuestion,800);
+}
+
+function endGame(){
+  document.querySelector(".game").classList.add("hidden");
+  document.querySelector(".result").classList.remove("hidden");
+
+  let avgTime=times.reduce((a,b)=>a+b,0)/times.length;
+  let score=Math.round((correct/totalQuestions*100)-avgTime*5);
+
+  document.getElementById("rName").textContent=playerName;
+  document.getElementById("rDate").textContent=new Date().toLocaleString();
+  document.getElementById("rCorrect").textContent=correct;
+  document.getElementById("rWrong").textContent=wrong;
+  document.getElementById("rAvgTime").textContent=avgTime.toFixed(2);
+  document.getElementById("rScore").textContent=score;
+}
+
+function downloadResult(){
+  let avgTime=times.reduce((a,b)=>a+b,0)/times.length;
+  let score=Math.round((correct/totalQuestions*100)-avgTime*5);
+
+  let csv="姓名,日期,正確,錯誤,平均反應時間(秒),總分\n";
+  csv+=`${playerName},${new Date().toLocaleString()},${correct},${wrong},${avgTime.toFixed(2)},${score}\n`;
+
+  let blob=new Blob([csv],{type:"text/csv"});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement("a");
+  a.href=url;a.download="stroop_result.csv";a.click();
+}
+</script>
+</body>
+</html>
